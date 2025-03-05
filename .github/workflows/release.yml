@@ -61,6 +61,6 @@ jobs:
     - name: Release
       uses: softprops/action-gh-release@v2
       with:
-        body: "\n[文件校验和](${{ steps.log-url.outputs.result }}#step:9:9)"
+        body: "\n\n\n[文件校验和](${{ steps.log-url.outputs.result }}#step:9:9)"
         draft: true
         files: ${{ env.dist }}*

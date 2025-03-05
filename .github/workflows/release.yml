@@ -1,0 +1,66 @@
+name: Release
+
+on:
+  push:
+    tags: [ v* ]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    env:
+      dist: ffxiv-dresser-analyze-${{ github.ref_name }}.zip
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 20
+        cache: 'npm'
+        cache-dependency-path: web/package-lock.json
+    - name: Build Web
+      run: |
+        npm install
+        npm run build
+      working-directory: web
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 8.0.x
+    - name: Build Client
+      run: dotnet build --configuration Release
+      working-directory: client
+
+    - name: Version file
+      run: Set-Content ./client/bin/Release/net8.0/ffxiv-dresser-analyze.${{ github.ref_name }} -Value ${{ github.sha }} -NoNewline
+    - name: Pack
+      run: 7z a -mx9 -bb ${{ env.dist }} ./client/bin/Release/net8.0/*
+    - name: Checksum
+      id: checksum
+      run: |
+        sha256sum ${{ env.dist }} | Set-Content ${{ env.dist }}.sha256 -NoNewline
+        Get-Content ${{ env.dist }}.sha256
+
+    - name: Get log URL
+      uses: actions/github-script@v7
+      id: log-url
+      with:
+        script: |
+          const { data } = await github.rest.actions.listJobsForWorkflowRunAttempt({
+            ...context.repo,
+            run_id: context.runId,
+            attempt_number: process.env.GITHUB_RUN_ATTEMPT,
+          });
+          return data.jobs[0].html_url;
+        result-encoding: string
+    - name: Release
+      uses: softprops/action-gh-release@v2
+      with:
+        body: "\n[文件校验和](${{ steps.log-url.outputs.result }}#step:9:9)"
+        draft: true
+        files: ${{ env.dist }}*

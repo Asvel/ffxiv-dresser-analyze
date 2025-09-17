@@ -6,7 +6,7 @@ namespace ffxiv_dresser_analyze_client
 {
     internal class DresserData
     {
-        private static readonly byte?[] sig = [0x74, 0x2C, 0x48, 0x8B, 0x0D, null, null, null, null, 0x48, 0x85, 0xC9];
+        private static readonly byte?[] sig = [0x48, 0x8B, 0x0D, null, null, null, null, 0x48, 0x8D, 0x44, 0x24, null, 0x0F, 0x57, 0xC0];
         private static readonly int dresserSize = 800;
 
         private readonly IntPtr hProcess;

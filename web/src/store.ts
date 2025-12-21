@@ -73,10 +73,14 @@ let pending = Promise.all([
   fetchJson('./data/identicals').then(v => { identicals = v }),
   fetchJson('./data/dyes').then(v => {
     dyeTypes = v;
+    // 贵重染剂：无法游戏内稳定获取，并且市场售价≥50000
     dyeTypes[101].expensive = true;  // 无瑕白
     dyeTypes[102].expensive = true;  // 煤玉黑
     dyeTypes[103].expensive = true;  // 柔彩粉
     dyeTypes[112].expensive = true;  // 闪耀银
+    dyeTypes[122].expensive = true;  // 金属粉
+    dyeTypes[123].expensive = true;  // 金属宝石红
+    dyeTypes[125].expensive = true;  // 金属黑暗蓝
   }),
 ]);
 

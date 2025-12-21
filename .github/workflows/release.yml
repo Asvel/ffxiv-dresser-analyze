@@ -41,10 +41,7 @@ jobs:
     - name: Pack
       run: 7z a -mx9 -bb ${{ env.dist }} ./client/bin/Release/net8.0/*
     - name: Checksum
-      id: checksum
-      run: |
-        sha256sum ${{ env.dist }} | Set-Content ${{ env.dist }}.sha256 -NoNewline
-        Get-Content ${{ env.dist }}.sha256
+      run: sha256sum ${{ env.dist }}
 
     - name: Get log URL
       uses: actions/github-script@v7
@@ -63,4 +60,4 @@ jobs:
       with:
         body: "\n\n\n[文件校验和](${{ steps.log-url.outputs.result }}#step:9:9)"
         draft: true
-        files: ${{ env.dist }}*
+        files: ${{ env.dist }}

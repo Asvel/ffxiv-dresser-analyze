@@ -72,6 +72,7 @@ namespace ffxiv_dresser_analyze_client
             AddJson("/data/outfits", GenerateOutfits());
             AddJson("/data/cabinets", GenerateCabinets());
             AddJson("/data/reclaims", GenerateReclaims());
+            AddJson("/data/identicals", GenerateIdenticals());
             AddJson("/data/dyes", GenerateDyes());
         }
 
@@ -92,7 +93,7 @@ namespace ffxiv_dresser_analyze_client
 
         private static ulong GetSortKey(Item eItem)
         {
-            return (((10000 - eItem.LevelItem.RowId) * 10000u + eItem.Unknown4) * 100000u + eItem.RowId);
+            return (((10000ul - eItem.LevelItem.RowId) * 100000u + eItem.Unknown4) * 100000u + eItem.RowId);
         }
 
         private object GenerateOutfits()
@@ -178,6 +179,28 @@ namespace ffxiv_dresser_analyze_client
                 }).ToList();
             ret.Sort((a, b) => a.category - b.category);
             return ret;
+        }
+
+        private object GenerateIdenticals()
+        {
+            var identicals = lumina.GetExcelSheet<Item>()!
+                .Where(eItem => eItem.IsGlamorous)
+                .GroupBy(eItem => (eItem.EquipSlotCategory.RowId, eItem.ModelMain))
+                .Where(group => group.Count() > 1)
+                .SelectMany(group =>
+                {
+                    var groupId = group.FirstOrDefault().RowId;
+                    return group.Select(eItem => (eItem, groupId, sortKey: (eItem.EquipSlotCategory.RowId, GetSortKey(eItem))));
+                })
+                .ToList();
+            identicals.Sort((a, b) => a.sortKey.CompareTo(b.sortKey));
+            return identicals.Select(x =>
+            {
+                var itemId = x.eItem.RowId;
+                var name = x.eItem.Name.ToString();
+                var dyeCount = x.eItem.DyeCount;
+                return new { x.groupId, itemId, name, dyeCount };
+            });
         }
 
         private object GenerateDyes()

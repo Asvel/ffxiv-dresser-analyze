@@ -28,6 +28,13 @@ interface Categorized {
   }[],
 }
 
+interface Identical {
+  groupId: number,
+  itemId: number
+  name: string,
+  dyeCount: number,
+}
+
 interface Dye {
   id: number,
   name: string,
@@ -57,11 +64,13 @@ async function fetchJson(url: string) {
 let outfits: Outfit[];
 let cabinets: Categorized[];
 let reclaims: Categorized[];
+let identicals: Identical[];
 let dyeTypes: Dye[];
 let pending = Promise.all([
   fetchJson('./data/outfits').then(v => { outfits = v; }),
   fetchJson('./data/cabinets').then(v => { cabinets = v; }),
   fetchJson('./data/reclaims').then(v => { reclaims = v; }),
+  fetchJson('./data/identicals').then(v => { identicals = v }),
   fetchJson('./data/dyes').then(v => {
     dyeTypes = v;
     dyeTypes[101].expensive = true;  // 无瑕白
@@ -202,5 +211,46 @@ export class Store {
         items: items.filter(x => x.dyed),
       }]
     }).flat().filter(group => group.items.length > 0);
+  }
+
+  get identicalAdvices() {
+    const groups = new Map<number, [Identical, DresserItem][]>();
+    for (const identical of identicals) {
+        const dresserItem = this.dresserItems.get(identical.itemId);
+        if (dresserItem === undefined) continue;
+        let group = groups.get(identical.groupId);
+        if (group === undefined) {
+          group = [];
+          groups.set(identical.groupId, group);
+        }
+        group.push([identical, dresserItem]);
+    }
+    return Array.from(groups.values())
+      .filter(group => group.length > 1)
+      .map(group => {
+        let dyed = false;
+        const dyeSet = new Set<number>();
+        var items = group.map(([identical, dresserItem]) => {
+          let dyeState = 1;
+          const dyes: Dye[] = [];
+          for (let i = 0; i < identical.dyeCount; i++) {
+            var dye = dyeTypes[dresserItem.dyes[i]];
+            dyed ||= dye.id > 0;
+            dyeState = (dyeState << 8) + dye.id;
+            dyes.push(dye);
+          }
+          dyeSet.add(dyeState);
+          return {
+            ...dresserItem,
+            name: identical.name,
+            dyes,
+          };
+        });
+        return {
+          items,
+          dyed,
+          dyeDiff: dyeSet.size > 1,
+        };
+      });
   }
 }

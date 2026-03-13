@@ -185,7 +185,7 @@ namespace ffxiv_dresser_analyze_client
         private object GenerateIdenticals(bool semi = false)
         {
             var identicals = lumina.GetExcelSheet<Item>()!
-                .Where(eItem => eItem.IsGlamorous && (!semi || eItem.DyeCount > 0))
+                .Where(eItem => eItem.IsGlamorous)
                 .GroupBy(eItem =>
                 (
                     eItem.EquipSlotCategory.RowId,

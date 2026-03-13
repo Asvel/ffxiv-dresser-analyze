@@ -224,7 +224,15 @@ export class Store {
     return this.getIdenticalAdvices(identicals);
   }
   get semiIdenticalAdvices() {
-    return this.getIdenticalAdvices(semiIdenticals);
+    const identicalItems = new Set<number>();
+    for (const group of this.identicalAdvices) {
+      for (const item of group.items) {
+        identicalItems.add(item.id);
+      }
+    }
+    // 只能在前端筛：A,B,C三件装备主模型相同，其中仅A可染色，那么投影台中仅有B,C时不展示，有A时则展示
+    return this.getIdenticalAdvices(semiIdenticals)
+      .filter(group => group.items.some(item => item.dyes.length > 0 || identicalItems.has(item.id)));
   }
   getIdenticalAdvices(base: Identical[]) {
     const groups = new Map<number, [Identical, DresserItem][]>();

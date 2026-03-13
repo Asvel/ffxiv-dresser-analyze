@@ -114,6 +114,10 @@ input {
   vertical-align: top;
 }
 
+.entry--empty {
+  margin: 4px 208px;
+}
+
 .badge {
   display: inline-block;
   min-width: 39px;

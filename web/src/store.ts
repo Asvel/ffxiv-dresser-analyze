@@ -65,12 +65,14 @@ let outfits: Outfit[];
 let cabinets: Categorized[];
 let reclaims: Categorized[];
 let identicals: Identical[];
+let semiIdenticals: Identical[];
 let dyeTypes: Dye[];
 let pending = Promise.all([
   fetchJson('./data/outfits').then(v => { outfits = v; }),
   fetchJson('./data/cabinets').then(v => { cabinets = v; }),
   fetchJson('./data/reclaims').then(v => { reclaims = v; }),
   fetchJson('./data/identicals').then(v => { identicals = v }),
+  fetchJson('./data/semi-identicals').then(v => { semiIdenticals = v }),
   fetchJson('./data/dyes').then(v => {
     dyeTypes = v;
     // 贵重染剂：无法游戏内稳定获取，并且市场售价≥50000
@@ -89,6 +91,7 @@ export class Store {
   dresserItems: Map<number, DresserItem>;
   retainedOutfitIds: Set<number> = new Set();
   showSingleItemOutfit = false;
+  showSemiIdenticals = false;
 
   static create() {
     const store: Store = createMutable(new Store() as any);
@@ -218,8 +221,14 @@ export class Store {
   }
 
   get identicalAdvices() {
+    return this.getIdenticalAdvices(identicals);
+  }
+  get semiIdenticalAdvices() {
+    return this.getIdenticalAdvices(semiIdenticals);
+  }
+  getIdenticalAdvices(base: Identical[]) {
     const groups = new Map<number, [Identical, DresserItem][]>();
-    for (const identical of identicals) {
+    for (const identical of base) {
         const dresserItem = this.dresserItems.get(identical.itemId);
         if (dresserItem === undefined) continue;
         let group = groups.get(identical.groupId);

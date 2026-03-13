@@ -73,6 +73,7 @@ namespace ffxiv_dresser_analyze_client
             AddJson("/data/cabinets", GenerateCabinets());
             AddJson("/data/reclaims", GenerateReclaims());
             AddJson("/data/identicals", GenerateIdenticals());
+            AddJson("/data/semi-identicals", GenerateIdenticals(semi: true));
             AddJson("/data/dyes", GenerateDyes());
         }
 
@@ -181,11 +182,17 @@ namespace ffxiv_dresser_analyze_client
             return ret;
         }
 
-        private object GenerateIdenticals()
+        private object GenerateIdenticals(bool semi = false)
         {
             var identicals = lumina.GetExcelSheet<Item>()!
-                .Where(eItem => eItem.IsGlamorous)
-                .GroupBy(eItem => (eItem.EquipSlotCategory.RowId, eItem.ModelMain))
+                .Where(eItem => eItem.IsGlamorous && (!semi || eItem.DyeCount > 0))
+                .GroupBy(eItem =>
+                (
+                    eItem.EquipSlotCategory.RowId,
+                    semi
+                        ? eItem.ModelMain >>> 32 > 0 ? eItem.ModelMain << 32 : eItem.ModelMain << 48
+                        : eItem.ModelMain
+                ))
                 .Where(group => group.Count() > 1)
                 .SelectMany(group =>
                 {

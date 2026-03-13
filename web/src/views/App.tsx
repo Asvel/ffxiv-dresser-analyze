@@ -36,8 +36,19 @@ export function App() {
             {advicesRender(() => store.cabinetAdvices, advice => <CategoryEntry {...advice()} />)}
             <h2 tabIndex="0">可失物回购<i>（大概范围，以及请注意自己是否满足购买条件）</i></h2>
             {advicesRender(() => store.reclaimAdvices, advice => <CategoryEntry {...advice()} />)}
-            <h2 tabIndex="0">外观完全相同</h2>
-            {advicesRender(() => store.identicalAdvices, advice => <IdenticalEntry {...advice()} />)}
+            <h2 tabIndex="0">
+              外观相同
+              <label>
+                <input
+                  type="checkbox"
+                  checked={store.showSemiIdenticals}
+                  onChange={e => store.showSemiIdenticals = e.target.checked}
+                />
+                包括仅主模型相同且可染色的装备
+              </label>
+            </h2>
+            {advicesRender(() => store.showSemiIdenticals ? store.semiIdenticalAdvices : store.identicalAdvices,
+              advice => <IdenticalEntry {...advice()} />)}
           </Show>
           <About />
         </Show>

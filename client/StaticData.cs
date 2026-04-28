@@ -221,4 +221,14 @@ namespace ffxiv_dresser_analyze_client
             });
         }
     }
+
+    [Sheet("Stain")]
+    readonly public struct Stain(ExcelPage page, uint offset, uint row) : IExcelRow<Stain>
+    {
+        public uint RowId => row;
+        public readonly Lumina.Text.ReadOnly.ReadOnlySeString Name => page.ReadString(offset, offset);
+        public readonly uint Color => page.ReadUInt32(offset + 8);
+        static Stain IExcelRow<Stain>.Create(ExcelPage page, uint offset, uint row) =>
+            new(page, offset, row);
+    }
 }

@@ -80,9 +80,6 @@ let pending = Promise.all([
     dyeTypes[102].expensive = true;  // 煤玉黑
     dyeTypes[103].expensive = true;  // 柔彩粉
     dyeTypes[112].expensive = true;  // 闪耀银
-    dyeTypes[122].expensive = true;  // 金属粉
-    dyeTypes[123].expensive = true;  // 金属宝石红
-    dyeTypes[125].expensive = true;  // 金属黑暗蓝
   }),
 ]);
 

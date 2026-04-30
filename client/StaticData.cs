@@ -34,6 +34,7 @@ namespace ffxiv_dresser_analyze_client
 
         private readonly ushort[] itemIconIds;
         private readonly HashSet<uint> cabinetItemIdSet;
+        private readonly Dictionary<uint, uint> itemOutfitIdMap;
         private int[]? itemCategories;
 
         public StaticData(string sqpackPath)
@@ -68,6 +69,7 @@ namespace ffxiv_dresser_analyze_client
             var sItem = lumina.GetExcelSheet<Item>()!;
             itemIconIds = sItem.Select(eItem => eItem.Icon).ToArray();
             cabinetItemIdSet = lumina.GetExcelSheet<Cabinet>()!.Select(e => e.Item.RowId).ToHashSet();
+            itemOutfitIdMap = [];
 
             AddJson("/data/outfits", GenerateOutfits());
             AddJson("/data/cabinets", GenerateCabinets());
@@ -114,6 +116,7 @@ namespace ffxiv_dresser_analyze_client
                 {
                     var itemId = (uint)eMirageStoreSetItem.ReadColumn(2 + i);
                     if (itemId == 0) continue;
+                    itemOutfitIdMap[itemId] = id;
                     var eItem = sItem[itemId];
                     var itemName = eItem.Name.ToString();
                     var dyeCount = eItem.DyeCount;
@@ -158,7 +161,15 @@ namespace ffxiv_dresser_analyze_client
                 return 0;
             }).ToArray();
 
+            var sItem = lumina.GetExcelSheet<Item>()!;
+            var outfits = items
+                .Select(eItem => itemOutfitIdMap.TryGetValue(eItem.RowId, out var outfitId) ? outfitId : 0)
+                .Where(outfitId => outfitId != 0)
+                .Distinct()
+                .Select(outfitId => sItem[outfitId]);
+
             var ret = items
+                .Concat(outfits)
                 .Where(eItem => eItem.Name.ByteLength > 0)
                 .Select(eItem =>
                 {

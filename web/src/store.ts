@@ -50,7 +50,7 @@ export enum DyeStatus {
 }
 
 const categories = [
-  '',
+  '套装',
   '主手', '副手',
   '头部', '身体', '手臂', '', '腿部', '脚部',
   '耳部', '颈部', '腕部', '戒指'
@@ -192,10 +192,12 @@ export class Store {
         if (dresserItem === undefined) return;
         let dyed = false;
         const dyes: Dye[] = [];
-        for (let i = 0; i < item.dyeCount; i++) {
-          var dye = dyeTypes[dresserItem.dyes[i]];
-          dyed ||= dye.id > 0;
-          dyes.push(dye);
+        if (group.category !== 0/*套装*/) {
+          for (let i = 0; i < item.dyeCount; i++) {
+            var dye = dyeTypes[dresserItem.dyes[i]];
+            dyed ||= dye.id > 0;
+            dyes.push(dye);
+          }
         }
         return {
           ...item,

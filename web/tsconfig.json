@@ -2,13 +2,11 @@
   "compilerOptions": {
     "target": "es2022",
     "module": "preserve",
-    "types": ["node", "@rsbuild/core/types"],
+    "types": ["@rsbuild/core/types"],
     "jsx": "preserve",
     "jsxImportSource": "solid-js",
     "noEmit": true,
-    "skipLibCheck": true,
     "verbatimModuleSyntax": true,
-    "strict": true,
     "strictPropertyInitialization": false,
   },
   "include": ["src"]

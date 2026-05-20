@@ -17,8 +17,8 @@ export default defineConfig({
     liveReload: false,
   },
   output: {
-    inlineScripts: prod,
-    inlineStyles: prod,
+    inlineScripts: true,
+    inlineStyles: true,
     sourceMap: {
       js: !prod && 'cheap-source-map',
     },
@@ -34,24 +34,5 @@ export default defineConfig({
       '/icon': 'http://localhost:8014',
     },
   },
-  tools: {
-    bundlerChain: chain => chain
-      .output
-        .publicPath('auto')
-        .end()
-      // .optimization.concatenateModules(false).end()  // for bundle analyze
-      .experiments({
-        rspackFuture: {
-          bundlerInfo: {
-            force: false,
-          },
-        },
-      }).end(),
-  },
-  performance: {
-    // bundleAnalyze: {},
-    chunkSplit: {
-      strategy: 'all-in-one',
-    },
-  },
+  splitChunks: false,
 });

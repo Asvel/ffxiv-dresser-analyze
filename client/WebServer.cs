@@ -19,6 +19,17 @@ namespace ffxiv_dresser_analyze_client
                 var req = ctx.Request;
                 var res = ctx.Response;
 
+                // 允许商城用户脚本从 localhost 读取只读数据；实际请求仍只暴露本地游戏状态。
+                res.AddHeader("Access-Control-Allow-Origin", "*");
+                res.AddHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+                res.AddHeader("Access-Control-Allow-Headers", "Content-Type");
+                if (req.HttpMethod.Equals("OPTIONS", StringComparison.OrdinalIgnoreCase))
+                {
+                    res.StatusCode = 204;
+                    res.Close();
+                    continue;
+                }
+
                 var path = req.Url!.AbsolutePath;
                 if (path == "/data/dresser")
                 {
@@ -34,11 +45,13 @@ namespace ffxiv_dresser_analyze_client
                         if (dresserData.Loaded)
                         {
                             resContent = dresserData.Json;
+                            res.AddHeader("X-Data-Loaded", "true");
                             res.AddHeader("Last-Modified", dresserData.LastModified);
                         }
                         else
                         {
                             resContent = [0x5b, 0x5d];  // "[]"
+                            res.AddHeader("X-Data-Loaded", "false");
                         }
                         res.AddHeader("Cache-Control", "max-age=0");
                         res.ContentType = "application/json";
@@ -47,8 +60,31 @@ namespace ffxiv_dresser_analyze_client
                         await res.OutputStream.WriteAsync(resContent);
                     }
                 }
+                else if (path == "/data/cabinet")
+                {
+                    dresserData.Read();
+                    if (dresserData.CabinetLoaded && dresserData.LastCabinetModified != null &&
+                        req.Headers.Get("If-Modified-Since") == dresserData.LastCabinetModified)
+                    {
+                        res.AddHeader("X-Not-Modified", "Not Modified");
+                        res.StatusCode = 304;
+                        res.Close();
+                        continue;
+                    }
+                    var resContent = dresserData.CabinetJson;
+                    res.AddHeader("Cache-Control", "max-age=0");
+                    if (dresserData.CabinetLoaded && dresserData.LastCabinetModified != null)
+                    {
+                        res.AddHeader("Last-Modified", dresserData.LastCabinetModified);
+                    }
+                    res.ContentType = "application/json";
+                    res.ContentEncoding = Encoding.UTF8;
+                    res.ContentLength64 = resContent.Length;
+                    await res.OutputStream.WriteAsync(resContent);
+                }
                 else if (path == "/")
                 {
+                    res.AddHeader("Cache-Control", "no-store, no-cache, must-revalidate");
                     res.ContentType = "text/html";
                     res.ContentEncoding = Encoding.UTF8;
                     res.ContentLength64 = html.Length;

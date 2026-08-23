@@ -73,6 +73,7 @@ namespace ffxiv_dresser_analyze_client
 
             AddJson("/data/outfits", GenerateOutfits());
             AddJson("/data/cabinets", GenerateCabinets());
+            AddJson("/data/cabinet-items", GenerateCabinetItems());
             AddJson("/data/reclaims", GenerateReclaims());
             AddJson("/data/identicals", GenerateIdenticals());
             AddJson("/data/semi-identicals", GenerateIdenticals(semi: true));
@@ -103,10 +104,12 @@ namespace ffxiv_dresser_analyze_client
         {
             var sItem = lumina.GetExcelSheet<Item>()!;
             var outfits = new List<(ulong SortKey, object Value)>();
+            var outfitIds = new HashSet<uint>();
             foreach (var eMirageStoreSetItem in lumina.GetExcelSheet<RawRow>(name: "MirageStoreSetItem")!)
             {
                 var id = eMirageStoreSetItem.RowId;
                 if (id == 0) continue;
+                outfitIds.Add(id);
                 var name = sItem[id].Name.ToString();
 
                 var items = new List<object>();
@@ -128,6 +131,27 @@ namespace ffxiv_dresser_analyze_client
                 if (items.Count == 0) continue;
                 outfits.Add((sortKey ?? 0, new { id, name, items, cabinet }));
             }
+
+            // Some mall clothing is stored as one cabinet item rather than a row
+            // in MirageStoreSetItem (for example, the Alisaie and Gaia outfits).
+            // Treat those standalone set items as one-piece outfits so they are
+            // visible on the home page and available to the mall importer.
+            foreach (var eCabinet in lumina.GetExcelSheet<Cabinet>()!)
+            {
+                var eItem = eCabinet.Item.Value;
+                var id = eItem.RowId;
+                if (id == 0 || outfitIds.Contains(id) || itemOutfitIdMap.ContainsKey(id)) continue;
+                var name = eItem.Name.ToString();
+                if (!name.EndsWith("套装", StringComparison.Ordinal)) continue;
+                var item = new { id, name, dyeCount = eItem.DyeCount };
+                outfits.Add((GetSortKey(eItem), new
+                {
+                    id,
+                    name,
+                    items = new[] { item },
+                    cabinet = true,
+                }));
+            }
             outfits.Sort((a, b) => a.SortKey.CompareTo(b.SortKey));
             return outfits.Select(x => x.Value).ToArray();
         }
@@ -135,6 +159,19 @@ namespace ffxiv_dresser_analyze_client
         private object GenerateCabinets()
         {
             return GenerateCategorized(lumina.GetExcelSheet<Cabinet>()!.Select(e => e.Item.Value));
+        }
+
+        private object GenerateCabinetItems()
+        {
+            return lumina.GetExcelSheet<Cabinet>()!
+                .Where(e => e.Item.RowId != 0 && e.Item.Value.Name.ByteLength > 0)
+                .Select(e => new
+                {
+                    cabinetId = e.RowId,
+                    id = e.Item.RowId,
+                    name = e.Item.Value.Name.ToString(),
+                })
+                .ToArray();
         }
         private object GenerateReclaims()
         {

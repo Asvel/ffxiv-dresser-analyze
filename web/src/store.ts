@@ -8,6 +8,12 @@ interface DresserItem {
   dyes: [number, number],
 }
 
+interface CabinetItem {
+  cabinetId: number,
+  id: number,
+  name: string,
+}
+
 interface Outfit {
   id: number,
   name: string,
@@ -61,8 +67,18 @@ async function fetchJson(url: string) {
   return await res.json();
 }
 
+function getDye(id: number): Dye {
+  return dyeTypes[id] ?? {
+    id,
+    name: id > 0 ? `未知染剂（${id}）` : '',
+    color: '000000',
+    expensive: false,
+  };
+}
+
 let outfits: Outfit[];
 let cabinets: Categorized[];
+let cabinetItems: CabinetItem[] = [];
 let reclaims: Categorized[];
 let identicals: Identical[];
 let semiIdenticals: Identical[];
@@ -70,6 +86,7 @@ let dyeTypes: Dye[];
 let pending = Promise.all([
   fetchJson('./data/outfits').then(v => { outfits = v; }),
   fetchJson('./data/cabinets').then(v => { cabinets = v; }),
+  fetchJson('./data/cabinet-items').then(v => { cabinetItems = v; }).catch(() => { cabinetItems = []; }),
   fetchJson('./data/reclaims').then(v => { reclaims = v; }),
   fetchJson('./data/identicals').then(v => { identicals = v }),
   fetchJson('./data/semi-identicals').then(v => { semiIdenticals = v }),
@@ -86,8 +103,13 @@ let pending = Promise.all([
 export class Store {
   ready = false;
   dresserItems: Map<number, DresserItem>;
-  retainedOutfitIds: Set<number> = new Set();
-  showSingleItemOutfit = false;
+  cabinetLoaded = false;
+  cabinetItemCount = 0;
+  dresserItemCount = 0;
+  dresserLoaded = false;
+  private dresserOnlyItems = new Map<number, DresserItem>();
+  cabinetItems = new Map<number, DresserItem>();
+  private loadedCabinetIds = new Set<number>();
   showSemiIdenticals = false;
 
   static create() {
@@ -112,32 +134,90 @@ export class Store {
   }
 
   async fetchDresser() {
-    const res = await fetch('./data/dresser');
-    if (this.dresserItems !== undefined && res.headers.has('X-Not-Modified')) return;
+    // Cabinet IDs need the static cabinet-to-item table before they can be merged.
+    await pending;
+    const stamp = Date.now();
+    const [dresserRes, cabinetRes] = await Promise.all([
+      fetch(`./data/dresser?_=${stamp}`, { cache: 'no-store' }),
+      fetch(`./data/cabinet?_=${stamp}`, { cache: 'no-store' }),
+    ]);
 
-    const data = await res.json() as DresserItem[];
-    const dresserItems = new Map<number, DresserItem>();
-    for (const item of data) {
-      dresserItems.set(item.id, item);
+    if (!dresserRes.headers.has('X-Not-Modified')) {
+      const data = await dresserRes.json() as DresserItem[];
+      // A transient process read can legitimately return [] while the previous
+      // snapshot is still valid. Never replace a non-empty snapshot with that
+      // unconfirmed empty response.
+      const dataLoaded = dresserRes.headers.get('X-Data-Loaded') !== 'false';
+      if (dataLoaded || this.dresserOnlyItems.size === 0 || data.length > 0) {
+        const dresserOnlyItems = new Map<number, DresserItem>();
+        for (const item of data) {
+          dresserOnlyItems.set(item.id, item);
+        }
+        this.dresserOnlyItems = dresserOnlyItems;
+      }
+      this.dresserLoaded = dataLoaded;
     }
-    this.dresserItems = dresserItems;
+
+    if (!cabinetRes.headers.has('X-Not-Modified')) {
+      const cabinet = await cabinetRes.json() as { loaded?: boolean, cabinetIds?: number[] };
+      this.cabinetLoaded = cabinet.loaded === true;
+      this.loadedCabinetIds = this.cabinetLoaded
+        ? new Set((cabinet.cabinetIds || []).map(id => Number(id)))
+        : new Set();
+    }
+    const cabinetOwnedItems = new Map<number, DresserItem>();
+    if (this.cabinetLoaded) {
+      for (const item of cabinetItems) {
+        if (!this.loadedCabinetIds.has(Number(item.cabinetId))) continue;
+        if (!cabinetOwnedItems.has(item.id)) {
+          cabinetOwnedItems.set(item.id, { id: item.id, hq: false, dyes: [0, 0] });
+        }
+      }
+    }
+    this.cabinetItems = cabinetOwnedItems;
+    this.dresserItemCount = this.dresserOnlyItems.size;
+    this.cabinetItemCount = this.cabinetItems.size;
+    this.dresserItems = new Map(this.dresserOnlyItems);
   }
 
   get outfitAdvices() {
+    return this.getDresserOutfitAdvices(true).filter(advice =>
+      advice.count > 0 && advice.count < advice.items.length);
+  }
+
+  get otherOutfitAdvices() {
+    return this.getDresserOutfitAdvices(false).filter(advice =>
+      advice.count === advice.items.length);
+  }
+
+  private getDresserOutfitAdvices(showCabinetBadge: boolean) {
+    const source = this.getDresserItemsExcludingCabinet();
+    return this.getOutfitAdvices(source, showCabinetBadge);
+  }
+
+  get cabinetOutfitAdvices() {
+    return this.getOutfitAdvices(this.cabinetItems, false);
+  }
+
+  private getOutfitAdvices(source: Map<number, DresserItem>, showCabinetBadge: boolean) {
     const advices = outfits.map(outfit => {
       let count = 0;
       let hqCount = 0;
       let dyeable = false;
       let dyed = false;
       let dyeExpensive = false;
+      const outfitSourceItem = source.get(outfit.id);
       const items = outfit.items.map(item => {
         const dyes: Dye[] = [];
-        const dresserItem = this.dresserItems.get(item.id);
-        if (dresserItem !== undefined) {
+        // The dresser can store a glamourized outfit as the outfit row itself
+        // instead of its individual component IDs. In that case every component
+        // is considered acquired for display and import purposes.
+        const sourceItem = source.get(item.id) ?? outfitSourceItem;
+        if (sourceItem !== undefined) {
           count++;
-          if (dresserItem.hq) hqCount++;
+          if (sourceItem.hq) hqCount++;
           for (let i = 0; i < item.dyeCount; i++) {
-            var dye = dyeTypes[dresserItem.dyes[i]];
+            var dye = getDye(sourceItem.dyes[i]);
             dyed ||= dye.id > 0;
             dyeExpensive ||= dye.expensive;
             dyes.push(dye);
@@ -146,14 +226,12 @@ export class Store {
         dyeable ||= item.dyeCount > 0;
         return {
           ...item,
-          hq: dresserItem?.hq,
+          hq: sourceItem?.hq,
           dyes,
-          acquired: dresserItem !== undefined,
+          acquired: sourceItem !== undefined,
         };
       })
       if (count === 0) return;
-      if (count === 1 && !this.showSingleItemOutfit && !this.retainedOutfitIds.has(outfit.id)) return;
-      if (count > 1) this.retainedOutfitIds.add(outfit.id);
       if (count < items.length && count === hqCount) {  // 现有全为HQ，缺的也用HQ
         for (const item of items) {
           item.hq = true;
@@ -172,7 +250,7 @@ export class Store {
         items,
         count,
         dyeStatus,
-        cabinet: outfit.cabinet,
+        cabinet: showCabinetBadge && outfit.cabinet,
         mixQuality: hqCount > 0 && hqCount < count,
       }
     }).filter(x => x !== undefined);
@@ -180,21 +258,28 @@ export class Store {
   }
 
   get cabinetAdvices() {
-    return this.getCategorizedAdvices(cabinets);
+    return this.getCategorizedAdvices(cabinets, this.getDresserItemsExcludingCabinet());
   }
   get reclaimAdvices() {
-    return this.getCategorizedAdvices(reclaims);
+    return this.getCategorizedAdvices(reclaims, this.dresserItems);
   }
-  getCategorizedAdvices(base: Categorized[]) {
+  private getDresserItemsExcludingCabinet() {
+    const items = new Map<number, DresserItem>();
+    for (const [id, item] of this.dresserItems) {
+      if (!this.cabinetItems.has(id)) items.set(id, item);
+    }
+    return items;
+  }
+  getCategorizedAdvices(base: Categorized[], source = this.dresserItems) {
     return base.map(group => {
       const items = group.items.map(item => {
-        const dresserItem = this.dresserItems.get(item.id);
+        const dresserItem = source.get(item.id);
         if (dresserItem === undefined) return;
         let dyed = false;
         const dyes: Dye[] = [];
         if (group.category !== 0/*套装*/) {
           for (let i = 0; i < item.dyeCount; i++) {
-            var dye = dyeTypes[dresserItem.dyes[i]];
+            var dye = getDye(dresserItem.dyes[i]);
             dyed ||= dye.id > 0;
             dyes.push(dye);
           }
@@ -254,7 +339,7 @@ export class Store {
           let dyeState = 1;
           const dyes: Dye[] = [];
           for (let i = 0; i < identical.dyeCount; i++) {
-            var dye = dyeTypes[dresserItem.dyes[i]];
+            var dye = getDye(dresserItem.dyes[i]);
             dyed ||= dye.id > 0;
             dyeState = (dyeState << 8) + dye.id;
             dyes.push(dye);

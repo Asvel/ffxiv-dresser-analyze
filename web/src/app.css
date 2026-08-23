@@ -15,23 +15,35 @@ html {
   color: #333;
 }
 
-h2 {
-  margin: 24px 0 8px 208px;
-  font-size: 24px;
+.section {
+  margin: 24px 0 8px;
 }
-h2:focus {
+.section--summary {
+  margin-left: 208px;
+  cursor: pointer;
+  font-size: 24px;
+  font-weight: bold;
+  line-height: 1.4286;
+}
+.section--summary:focus {
   outline: none;
 }
-h2 i {
+.section--title i {
   margin-left: 4px;
   font-size: 14px;
   font-weight: normal;
   color: #999;
 }
-h2 label {
+.section--controls {
   margin-left: 8px;
   font-size: 14px;
   font-weight: normal;
+}
+.section--controls label {
+  cursor: pointer;
+}
+.section--body {
+  margin-top: 8px;
 }
 
 label {
@@ -49,11 +61,27 @@ input {
   padding: 4px 8px;
 }
 
+.data-status {
+  margin: 8px 0 -16px 208px;
+  color: #777;
+  font-size: 13px;
+}
+.data-status span + span {
+  margin-left: 16px;
+}
+
 .nodata {
   margin: 40px 0;
   font-size: 15px;
   font-weight: bold;
   text-align: center;
+}
+.nodata small {
+  display: block;
+  margin-top: 8px;
+  color: #777;
+  font-size: 13px;
+  font-weight: normal;
 }
 
 .entry {
